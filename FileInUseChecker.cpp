@@ -92,6 +92,26 @@ private:
     WCHAR sessionKey[CCH_RM_SESSION_KEY + 1];
 };
 
+// 提取提升权限的函数
+bool ElevatePrivilege(const std::wstring& privilegeName) {
+    ScopedHandle hToken;
+    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &hToken)) {
+        return false;
+    }
+
+    LUID luid;
+    if (!LookupPrivilegeValue(NULL, privilegeName.c_str(), &luid)) {
+        return false;
+    }
+
+    TOKEN_PRIVILEGES tp;
+    tp.PrivilegeCount = 1;
+    tp.Privileges[0].Luid = luid;
+    tp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+
+    return AdjustTokenPrivileges(hToken, FALSE, &tp, sizeof(TOKEN_PRIVILEGES), NULL, NULL) != 0;
+}
+
 std::vector<ProcessInfo> GetProcessesUsingFile(const std::wstring& filePath) {
     std::vector<ProcessInfo> processes;
     std::wstring fullPath = GetFullPathAndRemoveQuotes(filePath);
@@ -103,29 +123,8 @@ std::vector<ProcessInfo> GetProcessesUsingFile(const std::wstring& filePath) {
     }
 
     // 提升权限
-    HANDLE hToken;
-    if (OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &hToken)) {
-        TOKEN_PRIVILEGES tkp = {};
-        if (LookupPrivilegeValue(NULL, SE_DEBUG_NAME, &tkp.Privileges[0].Luid)) {
-            tkp.PrivilegeCount = 1;
-            tkp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
-            AdjustTokenPrivileges(hToken, FALSE, &tkp, 0, NULL, 0);
-        }
-        CloseHandle(hToken);
-    }
-
-    // 尝试获取更多权限
-    if (OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &hToken)) {
-        LUID luid;
-        if (LookupPrivilegeValue(NULL, SE_BACKUP_NAME, &luid)) {
-            TOKEN_PRIVILEGES tp;
-            tp.PrivilegeCount = 1;
-            tp.Privileges[0].Luid = luid;
-            tp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
-            AdjustTokenPrivileges(hToken, FALSE, &tp, sizeof(TOKEN_PRIVILEGES), NULL, NULL);
-        }
-        CloseHandle(hToken);
-    }
+    ElevatePrivilege(SE_DEBUG_NAME);
+    ElevatePrivilege(SE_BACKUP_NAME);
 
     DWORD sessionHandle;
     WCHAR sessionKey[CCH_RM_SESSION_KEY + 1] = { 0 };
@@ -244,4 +243,4 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     }
 
     return 0;
-} 
+}
