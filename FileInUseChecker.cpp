@@ -217,8 +217,13 @@ std::vector<ProcessInfo> GetProcessesUsingFile(const std::wstring& filePath) {
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
     int argc;
     LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
-    if (argv == NULL || argc <= 1) {
-        MessageBox(NULL, L"请通过右键菜单选择文件来使用此程序", L"提示", MB_OK | MB_ICONINFORMATION);
+    if (argv == NULL) {
+        MessageBox(NULL, L"参数错误", L"错误", MB_OK | MB_ICONERROR);
+        return 1;
+    }
+
+    if (argc <= 1) {
+        MessageBox(NULL, L"请通过右键菜单选择文件或拖动文件到程序图标上使用此程序", L"提示", MB_OK | MB_ICONINFORMATION);
         LocalFree(argv);
         return 1;
     }
